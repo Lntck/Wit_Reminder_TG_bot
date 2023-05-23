@@ -89,6 +89,7 @@ def get_time(message):
         month = f"0{month}"
     m.append([f"{hour}:{minute} - {day}.{month}.{year}", notif])
     bot.send_message(message.chat.id, f'✉Напоминание на {day}.{month}.{year} {hour}:{minute}✉\n✉C Именем {notif}✉\n✅Добавлено✅')
+    month = int(month[1:])
 
 
 def send_notif(note):
