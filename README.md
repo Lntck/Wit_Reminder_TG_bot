@@ -10,7 +10,7 @@ You can use the bot under: @Wit_reminder_bot
 * telebot, datetime, time, threading, calendar
 
 ## Demo Video
-<img src="#" width="197" height="426"/>
+<img src="stickers/IMG_5118.gif" width="197" height="426"/>
 
 ## Description
 An early version of telegram bot reminders, in the future data storage in the Sqlite3 database and other things will be implemented.
