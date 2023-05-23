@@ -4,15 +4,18 @@ from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeybo
 from datetime import datetime, timedelta
 from time import sleep
 import threading
+import calendar
 
 bot = telebot.TeleBot(config.Token)
 m = []
-date = ""
 time = ""
 notif = ""
 mes = ""
 hour = 12
 minute = 30
+year = None
+month = None
+day = None
 
 
 @bot.message_handler(commands=['start'])
@@ -24,15 +27,22 @@ def start(message):
     btn2 = KeyboardButton("📒Список Напоминаний📒")
     buttons.add(btn1, btn2)
     bot.send_sticker(message.chat.id, open("stickers/Welcome.webp", 'rb'))
-    bot.send_message(message.chat.id, "Привет! Меня зовут Wit\nМой создатель: [Rushan Shafeev](https://shafeev.site)\nЯ буду помогать тебе не забывать о важных вещах.\nЗадай своё первое напоминание!", parse_mode='Markdown', reply_markup=buttons)
+    bot.send_message(message.chat.id,
+                     "Привет! Меня зовут Wit\nМой создатель: [Rushan Shafeev](https://shafeev.site)\nЯ буду помогать тебе не забывать о важных вещах.\nЗадай своё первое напоминание!",
+                     parse_mode='Markdown', reply_markup=buttons)
 
 
 @bot.message_handler(content_types=['text'])
 def text(message):
+    global year, month, mes
+    mes = message
     if message.text == "✏Задать Напоминание✏":
-        # bot.send_message(message.chat.id, "Введите дату в которое должно прийти уведомление в формате DD.MM.YY")
-        # bot.register_next_step_handler(message, get_date)
         bot.send_message(message.chat.id, 'Введи Название Напоминания')
+        now = datetime.now()
+        if year is None:
+            year = now.year
+        if month is None:
+            month = now.month
         bot.register_next_step_handler(message, get_notif)
     elif message.text == "📒Список Напоминаний📒":
         bot.send_sticker(message.chat.id, open("stickers/tasks.webp", 'rb'))
@@ -51,55 +61,82 @@ def text(message):
 def get_notif(message):
     global notif
     notif = message.text
-    # date = message.text.split('.')
-    # bot.send_message(message.chat.id, 'Введите время в которое должно прийти уведомление', reply_markup=create_clock())
-    bot.send_message(message.chat.id, "🗓 Введи дату в формате DD.MM.YYYY 🗓")
-    bot.register_next_step_handler(message, get_date)
-
-
-def get_date(message):
-    global date
-    # proverka date
-    date = message.text.split('.')
-    try:
-        if (datetime(int(date[-1]), int(date[-2]), int(date[-3])) - datetime.now()).days < -1:
-            bot.send_sticker(message.chat.id, open("stickers/incorrect.webp", 'rb'))
-            bot.send_message(message.chat.id, "⚠Неверно Введена дата⚠\n❗Дата напоминания не может быть прошедшей❗")
-            return
-    except:
-        bot.send_sticker(message.chat.id, open("stickers/incorrect.webp", 'rb'))
-        bot.send_message(message.chat.id, "⚠Неверно Введена дата⚠\n❗Введи дату в формате DD.MM.YYYY❗")
-        return
-    # bot.send_message(message.chat.id, 'Введите Название Уведомления')
-    # bot.register_next_step_handler(message, get_notif)
-    bot.send_message(message.chat.id, '⏰Введи время в ввиде HH:MM⏰')
-    bot.register_next_step_handler(message, get_time)
+    bot.send_message(message.chat.id, "🗓 Ввыбери дату в календаре 🗓", reply_markup=create_calendar())
 
 
 def get_time(message):
-    global hour, minute
+    global hour, minute, day, month
     hour, minute = map(str, message.text.split(':'))
     try:
-        if (timedelta(hours=int(hour), minutes=int(minute)) - timedelta(hours=datetime.now().hour, minutes=datetime.now().minute)).days < 0:
-            bot.send_sticker(message.chat.id, open("stickers/incorrect.webp", 'rb'))
-            bot.send_message(message.chat.id, "⚠Неверно Введено время⚠\n❗Время напоминания не может быть прошедшим❗")
-            return
-    except:
+        if month - datetime.now().month == 0:
+            if int(day) - datetime.now().day == 0:
+                if (timedelta(hours=int(hour), minutes=int(minute)) - timedelta(hours=datetime.now().hour, minutes=datetime.now().minute)).days < 0:
+                    bot.send_sticker(message.chat.id, open("stickers/incorrect.webp", 'rb'))
+                    bot.send_message(message.chat.id, "⚠Неверно Введено время⚠\n❗Время напоминания не может быть прошедшим❗")
+                    return
+    except ValueError:
         bot.send_sticker(message.chat.id, open("stickers/incorrect.webp", 'rb'))
         bot.send_message(message.chat.id, "⚠Неверно Введено время⚠\n❗Введи время в формате HH:MM❗")
         return
-    # notif = message.text
+
     if len(str(hour)) == 1:
         hour = f"0{hour}"
     if len(str(minute)) == 1:
         minute = f"0{minute}"
-    m.append([f"{hour}:{minute} - {date[-3]}.{date[-2]}.{date[-1]}", notif])
-    bot.send_message(message.chat.id, f'✉Напоминание на {date[-3]}.{date[-2]}.{date[-1]} {hour}:{minute}, с названием {notif}✉\n✅Добавлено✅')
+    if len(str(day)) == 1:
+        day = f"0{day}"
+    if len(str(month)) == 1:
+        month = f"0{month}"
+    m.append([f"{hour}:{minute} - {day}.{month}.{year}", notif])
+    bot.send_message(message.chat.id, f'✉Напоминание на {day}.{month}.{year} {hour}:{minute}✉\n✉C Именем {notif}✉\n✅Добавлено✅')
 
 
-def send_notif(text):
+def send_notif(note):
     bot.send_sticker(mes.chat.id, open("stickers/notif.webp", 'rb'))
-    bot.send_message(mes.chat.id, f"🔔 Тебе Пришло Напоминание! 🔔\n📍 {text} 📍")
+    bot.send_message(mes.chat.id, f"🔔 Тебе Пришло Напоминание! 🔔\n📍 {note} 📍")
+
+
+def create_calendar():
+    keyboard = list()
+    keyboard.append([InlineKeyboardButton(f"{calendar.month_name[month]} {str(year)}",callback_data="IGNORE")])
+    keyboard.append([InlineKeyboardButton(i, callback_data="IGNORE") for i in ["ПН","ВТ","СР","ЧТ","ПТ","СБ","ВС"]])
+    my_calendar = calendar.monthcalendar(year, month)
+    for week in my_calendar:
+        keyboard.append([InlineKeyboardButton(" ", callback_data="IGNORE") if i == 0 else InlineKeyboardButton(str(i), callback_data=f"DAY{i}") for i in week])
+    keyboard.append([InlineKeyboardButton(i[0], callback_data=i[1]) for i in [("<", "PREV-MONTH"), (" ", "IGNORE"), (">", "NEXT-MONTH")]])
+    return InlineKeyboardMarkup(keyboard)
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def process_calendar_selection(call):
+    global year, month, day
+    if call.data == "PREV-MONTH":
+        if month - 1 < 1:
+            month = 12
+        else:
+            month -= 1
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                              text="🗓 Ввыбери дату в календаре 🗓", reply_markup=create_calendar())
+    elif call.data == "NEXT-MONTH":
+        if month + 1 > 12:
+            month = 1
+        else:
+            month += 1
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                              text="🗓 Ввыбери дату в календаре 🗓", reply_markup=create_calendar())
+    elif call.data[:3] == "DAY":
+        day = call.data[3:]
+        if (datetime(int(year), int(month), int(day)) - datetime.now()).days < -1:
+            bot.send_sticker(mes.chat.id, open("stickers/incorrect.webp", 'rb'))
+            bot.send_message(mes.chat.id, "⚠Неверно Ввыбрана дата⚠\n❗Дата напоминания не может быть прошедшей❗")
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                  text="🗓 Ввыбери дату в календаре 🗓", reply_markup=None)
+            bot.send_message(mes.chat.id, "🗓 Ввыбери дату в календаре 🗓", reply_markup=create_calendar())
+
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                              text="🗓 Ввыбери дату в календаре 🗓", reply_markup=None)
+        bot.send_message(mes.chat.id, '⏰Введи время в ввиде HH:MM⏰')
+        bot.register_next_step_handler(mes, get_time)
 
 
 def reminder():
@@ -119,85 +156,6 @@ def checker():
     while True:
         reminder()
         sleep(31)
-
-
-# def create_clock(m=None, user=None):
-#     global hour, minute
-#     keyboard = []
-#     now = datetime.now()
-#     utc = 0
-#     if not hour:
-#         hour = now.hour
-#         if hour > 12:
-#             m = "pm"
-#         else:
-#             m = "am"
-#         if hour > 12:
-#             hour -= 12
-#         if hour + utc > 12:
-#             hour += utc - 12
-#         elif hour + utc < 0:
-#             hour += utc + 12
-#         else:
-#             hour += utc
-#
-#     row = []
-#     row.append(InlineKeyboardButton("↑", callback_data="PLUS-HOUR"))
-#     row.append(InlineKeyboardButton("↑", callback_data="PLUS-MINUTE"))
-#     keyboard.append(row)
-#
-#     row = []
-#     row.append(InlineKeyboardButton(str(hour), callback_data="data_ignore"))
-#     row.append(InlineKeyboardButton(str(minute), callback_data="data_ignore"))
-#     keyboard.append(row)
-#
-#     row = []
-#     row.append(InlineKeyboardButton("↓", callback_data="MINUS-HOUR"))
-#     row.append(InlineKeyboardButton("↓", callback_data="MINUS-MINUTE"))
-#     keyboard.append(row)
-#
-#     row = []
-#     row.append(InlineKeyboardButton("OK", callback_data="OK"))
-#     keyboard.append(row)
-#     return InlineKeyboardMarkup(keyboard)
-
-#
-# @bot.callback_query_handler(func=lambda call: True)
-# def handle(call):
-#     global hour, minute
-#     if call.data == "PLUS-HOUR":
-#         if hour + 1 > 24:
-#             hour = 0
-#         else:
-#             hour += 1
-#         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.id, reply_markup=create_clock(),
-#                               text=f'Введите время в которое должно прийти уведомление {hour}:{minute}')
-#     elif call.data == "MINUS-HOUR":
-#         if hour - 1 < 0:
-#             hour = 24
-#         else:
-#             hour -= 1
-#         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.id, reply_markup=create_clock(),
-#                               text=f'Введите время в которое должно прийти уведомление {hour}:{minute}')
-#     elif call.data == "PLUS-MINUTE":
-#         if minute + 5 > 55:
-#             minute = 0
-#         else:
-#             minute += 5
-#         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.id, reply_markup=create_clock(),
-#                               text=f'Введите время в которое должно прийти уведомление {hour}:{minute}')
-#     elif call.data == "MINUS-MINUTE":
-#         if minute - 5 < 0:
-#             minute = 55
-#         else:
-#             minute -= 5
-#         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.id, reply_markup=create_clock(),
-#                               text=f'Введите время в которое должно прийти уведомление {hour}:{minute}')
-#     elif call.data == "OK":
-#         bot.register_next_step_handler(mes, get_time(mes))
-#
-#         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.id, reply_markup=None,
-#                               text=f'Введите время в которое должно прийти уведомление {hour}:{minute}')
 
 
 x = threading.Thread(target=checker)
